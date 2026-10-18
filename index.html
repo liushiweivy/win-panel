@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统控制台 · win-panel</title>
+<style>
+  :root {
+    --bg: #080c14;
+    --panel: rgba(255,255,255,.035);
+    --panel-hi: rgba(255,255,255,.06);
+    --line: rgba(173,201,255,.12);
+    --line-hi: rgba(173,201,255,.28);
+    --txt: #e7eefc;
+    --dim: #8b98b2;
+    --amber: #f2b15e;
+    --red: #ff6b6b;
+    --teal: #67e8d4;
+    --blue: #7db0ff;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font: 14px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+    color: var(--txt);
+    background:
+      radial-gradient(1100px 520px at 78% -8%, rgba(103,232,212,.10), transparent 60%),
+      radial-gradient(900px 480px at 8% 108%, rgba(242,177,94,.08), transparent 60%),
+      var(--bg);
+    min-height: 100vh;
+    padding: 22px clamp(14px, 3vw, 40px) 40px;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; letter-spacing: .12em; }
+  .brand .pwr {
+    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+    font-size: 20px; color: var(--amber);
+    background: linear-gradient(160deg, rgba(242,177,94,.18), rgba(242,177,94,.04));
+    border: 1px solid rgba(242,177,94,.35);
+  }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: 4px; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--dim);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px;
+    background: rgba(0,0,0,.25);
+  }
+  .chip b { color: var(--teal); font-weight: 600; }
+  .clock { margin-left: auto; text-align: right; }
+  .clock .hm { font-family: var(--mono); font-size: 26px; font-weight: 600; letter-spacing: .06em; }
+  .clock .up { font-size: 12px; color: var(--dim); }
+
+  /* ---------- Bento ---------- */
+  .grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(12, 1fr);
+    grid-auto-rows: min-content;
+  }
+  .card {
+    grid-column: span 12;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px; backdrop-filter: blur(8px);
+  }
+  @media (min-width: 920px) {
+    .card.timer   { grid-column: span 7; }
+    .card.power   { grid-column: span 5; }
+    .card.apps    { grid-column: span 8; }
+    .card.maint   { grid-column: span 4; }
+    .card.folders { grid-column: span 7; }
+    .card.sites   { grid-column: span 5; }
+  }
+  .card h2 {
+    font-size: 13px; letter-spacing: .22em; color: var(--dim);
+    font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  /* ---------- 定时卡 ---------- */
+  .seg { display: inline-flex; border: 1px solid var(--line-hi); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  .seg button {
+    appearance: none; border: 0; background: transparent; color: var(--dim);
+    font: inherit; font-size: 13px; padding: 8px 22px; cursor: pointer; letter-spacing: .1em;
+  }
+  .seg button.on { background: rgba(242,177,94,.16); color: var(--amber); font-weight: 600; }
+  .seg button.on.red { background: rgba(255,107,107,.16); color: var(--red); }
+
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .presets button {
+    flex: 1; min-width: 64px; padding: 10px 0; cursor: pointer; font: 600 15px var(--mono);
+    color: var(--txt); background: rgba(255,255,255,.04);
+    border: 1px solid var(--line); border-radius: 10px; transition: .15s;
+  }
+  .presets button small { display: block; font-weight: 400; font-size: 10px; color: var(--dim); font-family: inherit; }
+  .presets button:hover { border-color: var(--amber); color: var(--amber); transform: translateY(-1px); }
+
+  .custom { display: flex; gap: 8px; }
+  .custom input {
+    flex: 1; min-width: 0; background: rgba(0,0,0,.3); border: 1px solid var(--line);
+    border-radius: 10px; color: var(--txt); font: 600 16px var(--mono); padding: 10px 14px; outline: none;
+  }
+  .custom input:focus { border-color: var(--amber); }
+  .custom input::-webkit-inner-spin-button { opacity: .4; }
+  .btn-plan {
+    padding: 0 26px; border: 0; border-radius: 10px; cursor: pointer;
+    font: 700 14px "Segoe UI","Microsoft YaHei"; letter-spacing: .12em;
+    color: #1a1206; background: linear-gradient(160deg, #ffd49a, var(--amber));
+  }
+  .btn-plan.red { background: linear-gradient(160deg, #ff9b9b, var(--red)); color: #2a0808; }
+  .btn-plan:hover { filter: brightness(1.08); }
+
+  .pending {
+    margin-top: 16px; border: 1px dashed rgba(242,177,94,.4); border-radius: 12px;
+    padding: 14px 16px; background: rgba(242,177,94,.05); display: none;
+  }
+  .pending.show { display: block; }
+  .pending .row1 { display: flex; align-items: baseline; gap: 12px; }
+  .pending .big { font: 700 34px/1 var(--mono); color: var(--amber); letter-spacing: .04em; }
+  .pending .lbl { color: var(--dim); font-size: 13px; }
+  .bar { height: 5px; border-radius: 3px; background: rgba(0,0,0,.4); margin: 10px 0 12px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--amber)); width: 100%; transition: width .3s linear; }
+  .btn-cancel {
+    width: 100%; padding: 10px 0; cursor: pointer; border-radius: 9px;
+    border: 1px solid rgba(255,107,107,.5); background: rgba(255,107,107,.12);
+    color: var(--red); font: 600 13px "Segoe UI","Microsoft YaHei"; letter-spacing: .14em;
+  }
+  .btn-cancel:hover { background: rgba(255,107,107,.22); }
+  .hint { margin-top: 10px; font-size: 11px; color: var(--dim); }
+
+  /* ---------- 电源卡 ---------- */
+  .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pbtn {
+    padding: 16px 8px; border-radius: 12px; cursor: pointer; text-align: center;
+    background: rgba(255,255,255,.04); border: 1px solid var(--line); color: var(--txt);
+    transition: .15s;
+  }
+  .pbtn .g { font-size: 22px; display: block; margin-bottom: 4px; color: var(--blue); }
+  .pbtn:hover { transform: translateY(-2px); border-color: var(--line-hi); background: var(--panel-hi); }
+  .pbtn.danger .g { color: var(--red); }
+  .pbtn.danger:hover { border-color: rgba(255,107,107,.6); box-shadow: 0 6px 22px -10px rgba(255,107,107,.5); }
+  .pbtn.warn .g { color: var(--amber); }
+  .pbtn.safe .g { color: var(--teal); }
+  .pbtn span { font-size: 13px; letter-spacing: .08em; }
+
+  /* ---------- 启动 / 维护 ---------- */
+  .agrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  .abtn {
+    display: flex; align-items: center; gap: 9px; padding: 11px 10px;
+    border-radius: 11px; cursor: pointer; text-align: left; min-width: 0;
+    background: rgba(255,255,255,.03); border: 1px solid var(--line); color: var(--txt);
+    transition: .15s;
+  }
+  .abtn .g {
+    width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 8px;
+    font-size: 15px; color: var(--teal); background: rgba(103,232,212,.09);
+    border: 1px solid rgba(103,232,212,.2); font-family: var(--mono);
+  }
+  .abtn .txt { min-width: 0; }
+  .abtn:hover { transform: translateY(-1px); border-color: var(--line-hi); background: var(--panel-hi); }
+  .abtn b { font-size: 12.5px; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .abtn small { color: var(--dim); font-size: 10px; font-family: var(--mono); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mbtn {
+    width: 100%; text-align: left; padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+    border-radius: 11px; background: rgba(255,255,255,.03); border: 1px solid var(--line); color: var(--txt);
+  }
+  .mbtn:last-child { margin-bottom: 0; }
+  .mbtn b { font-size: 13px; display: block; }
+  .mbtn small { color: var(--dim); }
+  .mbtn:hover { border-color: var(--amber); background: var(--panel-hi); }
+
+  /* ---------- 自定义链接（文件夹 / 网站） ---------- */
+  .abtn.link { position: relative; padding-right: 26px; }
+  .abtn.link .del {
+    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px;
+    display: grid; place-items: center; border-radius: 5px;
+    font-size: 10px; color: var(--dim); opacity: 0; transition: .15s;
+  }
+  .abtn.link:hover .del { opacity: 1; }
+  .abtn.link .del:hover { color: var(--red); background: rgba(255,107,107,.15); }
+  .addrow {
+    display: flex; gap: 8px; margin-top: 12px; padding-top: 12px;
+    border-top: 1px dashed var(--line);
+  }
+  .addrow input {
+    width: 110px; background: rgba(0,0,0,.3); border: 1px solid var(--line);
+    border-radius: 9px; color: var(--txt); font-size: 12.5px; padding: 8px 10px; outline: none;
+  }
+  .addrow input.grow { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; }
+  .addrow input:focus { border-color: var(--teal); }
+  .btn-add {
+    padding: 0 16px; border: 1px solid rgba(103,232,212,.4); border-radius: 9px;
+    background: rgba(103,232,212,.1); color: var(--teal); cursor: pointer;
+    font: 600 12.5px "Segoe UI","Microsoft YaHei"; white-space: nowrap;
+  }
+  .btn-add:hover { background: rgba(103,232,212,.2); }
+  .empty-tip { color: var(--dim); font-size: 12px; padding: 8px 2px; }
+
+  /* ---------- Win 快捷键 ---------- */
+  .hk-hint { font-size: 11px; color: var(--dim); margin: -8px 0 16px; }
+  .hksub { margin-bottom: 18px; }
+  .hksub:last-child { margin-bottom: 0; }
+  .hksub h3 {
+    font-size: 11px; letter-spacing: .18em; color: var(--blue); font-weight: 600;
+    margin-bottom: 9px; display: flex; align-items: center; gap: 8px;
+  }
+  .hksub h3::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .hkgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 8px; }
+  .hkbtn {
+    display: flex; align-items: center; gap: 9px; padding: 9px 10px;
+    border-radius: 10px; cursor: pointer; text-align: left; min-width: 0;
+    background: rgba(255,255,255,.03); border: 1px solid var(--line); color: var(--txt);
+    transition: .15s;
+  }
+  .hkbtn:hover { transform: translateY(-1px); border-color: rgba(125,176,255,.45); background: var(--panel-hi); }
+  .hkbtn:active { transform: translateY(0); filter: brightness(1.2); }
+  .hkbtn kbd {
+    flex: none; font: 600 10.5px var(--mono); color: var(--blue);
+    background: rgba(125,176,255,.10); border: 1px solid rgba(125,176,255,.3);
+    border-bottom-width: 2px; border-radius: 6px; padding: 2px 6px; white-space: nowrap;
+  }
+  .hkbtn span {
+    font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  footer { margin-top: 22px; text-align: center; color: var(--dim); font-size: 11px; letter-spacing: .06em; }
+
+  /* ---------- 确认弹窗 / Toast ---------- */
+  .mask {
+    position: fixed; inset: 0; background: rgba(3,6,12,.72); backdrop-filter: blur(3px);
+    display: none; place-items: center; z-index: 50;
+  }
+  .mask.show { display: grid; }
+  .modal {
+    width: min(420px, calc(100vw - 40px)); border-radius: 16px; padding: 26px;
+    background: linear-gradient(165deg, #151d2e, #0d1320);
+    border: 1px solid rgba(255,107,107,.4); box-shadow: 0 30px 80px -20px rgba(0,0,0,.8);
+  }
+  .modal h3 { color: var(--red); font-size: 17px; margin-bottom: 10px; letter-spacing: .08em; }
+  .modal p { color: var(--dim); font-size: 13px; margin-bottom: 22px; }
+  .modal .acts { display: flex; gap: 10px; }
+  .modal button { flex: 1; padding: 11px 0; border-radius: 10px; cursor: pointer; font: inherit; }
+  .modal .yes { border: 0; background: linear-gradient(160deg,#ff9b9b,var(--red)); color: #2a0808; font-weight: 700; }
+  .modal .no { border: 1px solid var(--line-hi); background: transparent; color: var(--txt); }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 34px; transform: translate(-50%, 20px);
+    background: #101828; border: 1px solid var(--line-hi); color: var(--txt);
+    padding: 11px 22px; border-radius: 999px; font-size: 13px; opacity: 0; pointer-events: none;
+    transition: .25s; z-index: 60; max-width: calc(100vw - 40px);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.err { border-color: rgba(255,107,107,.6); color: #ffc4c4; }
+  #toast.ok { border-color: rgba(103,232,212,.5); color: #c9fff6; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="pwr">⏻</span>系统控制台</div>
+  <div class="chips">
+    <span class="chip">主机 <b id="host">—</b></span>
+    <span class="chip">用户 <b id="user">—</b></span>
+  </div>
+  <div class="clock">
+    <div class="hm" id="clock">--:--:--</div>
+    <div class="up" id="uptime">开机 —</div>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- 定时关机 -->
+  <section class="card timer">
+    <h2>定时关机 / 重启</h2>
+    <div class="seg" id="seg">
+      <button data-kind="shutdown" class="on">关 机</button>
+      <button data-kind="restart">重 启</button>
+    </div>
+    <div class="presets" id="presets">
+      <button data-min="15">15<small>分钟</small></button>
+      <button data-min="30">30<small>分钟</small></button>
+      <button data-min="45">45<small>分钟</small></button>
+      <button data-min="60">60<small>分钟</small></button>
+      <button data-min="90">90<small>分钟</small></button>
+      <button data-min="120">120<small>分钟</small></button>
+    </div>
+    <div class="custom">
+      <input id="customMin" type="number" min="1" max="1440" placeholder="自定义分钟数（1–1440）">
+      <button class="btn-plan" id="btnPlan">计 划</button>
+    </div>
+    <div class="pending" id="pending">
+      <div class="row1">
+        <span class="big" id="cd">--:--</span>
+        <span class="lbl" id="cdLbl">后自动关机</span>
+      </div>
+      <div class="bar"><i id="cdBar"></i></div>
+      <button class="btn-cancel" id="btnCancel">取 消 关 机 / 重 启 计 划</button>
+    </div>
+    <p class="hint">注：系统只允许一个关机计划，新计划会顶替旧计划；若曾用命令行设置过关机（本面板不知情），点取消也能一并取消。</p>
+  </section>
+
+  <!-- 电源 -->
+  <section class="card power">
+    <h2>电源</h2>
+    <div class="pgrid">
+      <button class="pbtn danger" data-act="shutdown_now"><span class="g">⏻</span><span>立即关机</span></button>
+      <button class="pbtn danger" data-act="restart_now"><span class="g">↻</span><span>立即重启</span></button>
+      <button class="pbtn warn" data-act="logoff"><span class="g" style="font-family:inherit;font-size:15px">销</span><span>注销</span></button>
+      <button class="pbtn warn" data-act="lock"><span class="g" style="font-family:inherit;font-size:15px">锁</span><span>锁定</span></button>
+      <button class="pbtn safe" data-act="hibernate"><span class="g">⏾</span><span>休眠</span></button>
+      <button class="pbtn safe" data-act="sleep"><span class="g">☾</span><span>睡眠</span></button>
+    </div>
+  </section>
+
+  <!-- 快捷启动 -->
+  <section class="card apps">
+    <h2>快捷启动</h2>
+    <div class="agrid" id="agrid">
+      <button class="abtn" data-launch="taskmgr"><span class="g">▤</span><span class="txt"><b>任务管理器</b><small>taskmgr</small></span></button>
+      <button class="abtn" data-launch="settings"><span class="g">⚙</span><span class="txt"><b>设置</b><small>ms-settings</small></span></button>
+      <button class="abtn" data-launch="control"><span class="g">▦</span><span class="txt"><b>控制面板</b><small>control</small></span></button>
+      <button class="abtn" data-launch="thispc"><span class="g">▣</span><span class="txt"><b>此电脑</b><small>explorer</small></span></button>
+      <button class="abtn" data-launch="downloads"><span class="g">↓</span><span class="txt"><b>下载</b><small>Downloads</small></span></button>
+      <button class="abtn" data-launch="documents"><span class="g">✎</span><span class="txt"><b>文档</b><small>Documents</small></span></button>
+      <button class="abtn" data-launch="cmd"><span class="g">&gt;_</span><span class="txt"><b>命令提示符</b><small>cmd</small></span></button>
+      <button class="abtn" data-launch="powershell"><span class="g" style="color:#67e8d4">PS</span><span class="txt"><b>PowerShell</b><small>pwsh</small></span></button>
+      <button class="abtn" data-launch="notepad"><span class="g">¶</span><span class="txt"><b>记事本</b><small>notepad</small></span></button>
+      <button class="abtn" data-launch="calc"><span class="g">∑</span><span class="txt"><b>计算器</b><small>calc</small></span></button>
+      <button class="abtn" data-launch="snip"><span class="g">⊟</span><span class="txt"><b>截图</b><small>screenclip</small></span></button>
+      <button class="abtn" data-launch="mstsc"><span class="g">▭</span><span class="txt"><b>远程桌面</b><small>mstsc</small></span></button>
+      <button class="abtn" data-launch="envvars"><span class="g">𝑥</span><span class="txt"><b>环境变量</b><small>sysdm.cpl</small></span></button>
+    </div>
+  </section>
+
+  <!-- 维护 -->
+  <section class="card maint">
+    <h2>系统维护</h2>
+    <button class="mbtn" data-act="minimize_all"><b>显示桌面</b><small>最小化全部窗口</small></button>
+    <button class="mbtn" data-act="clear_clipboard"><b>清空剪贴板</b><small>防止敏感内容残留</small></button>
+    <button class="mbtn" data-act="empty_bin"><b>清空回收站</b><small>立即释放磁盘，不弹确认</small></button>
+  </section>
+
+  <!-- 常用文件夹（可增删） -->
+  <section class="card folders">
+    <h2>常用文件夹</h2>
+    <div class="agrid" id="fgrid"></div>
+    <div class="addrow">
+      <input id="fName" maxlength="20" placeholder="名称">
+      <input id="fPath" class="grow" placeholder="文件夹路径，如 D:projects">
+      <button class="btn-add" id="fAdd">＋ 添加</button>
+    </div>
+  </section>
+
+  <!-- 常用网站（可增删） -->
+  <section class="card sites">
+    <h2>常用网站</h2>
+    <div class="agrid" id="wgrid"></div>
+    <div class="addrow">
+      <input id="wName" maxlength="20" placeholder="名称">
+      <input id="wUrl" class="grow" placeholder="网址，https://…">
+      <button class="btn-add" id="wAdd">＋ 添加</button>
+    </div>
+  </section>
+
+  <!-- Win 快捷键 -->
+  <section class="card hk" id="hkcard">
+    <h2>Win 快捷键</h2>
+    <p class="hk-hint">服务端模拟真实按键，效果等同亲手按下组合键；「吸附」类作用于当前前台窗口（点按钮时通常是本浏览器）。</p>
+
+    <div class="hksub">
+      <h3>桌面 · 窗口</h3>
+      <div class="hkgrid">
+        <button class="hkbtn" data-hk="win_d"><kbd>Win+D</kbd><span>显示桌面</span></button>
+        <button class="hkbtn" data-hk="win_m"><kbd>Win+M</kbd><span>最小化全部</span></button>
+        <button class="hkbtn" data-hk="win_shift_m"><kbd>Win+Shift+M</kbd><span>还原窗口</span></button>
+        <button class="hkbtn" data-hk="win_home"><kbd>Win+Home</kbd><span>仅留当前</span></button>
+        <button class="hkbtn" data-hk="win_peek"><kbd>Win+,</kbd><span>速览桌面</span></button>
+        <button class="hkbtn" data-hk="win_tab"><kbd>Win+Tab</kbd><span>任务视图</span></button>
+        <button class="hkbtn" data-hk="win_z"><kbd>Win+Z</kbd><span>窗口对齐布局</span></button>
+        <button class="hkbtn" data-hk="snap_left"><kbd>Win+←</kbd><span>吸附到左半屏</span></button>
+        <button class="hkbtn" data-hk="snap_right"><kbd>Win+→</kbd><span>吸附到右半屏</span></button>
+        <button class="hkbtn" data-hk="snap_up"><kbd>Win+↑</kbd><span>吸附最大化</span></button>
+        <button class="hkbtn" data-hk="snap_down"><kbd>Win+↓</kbd><span>吸附还原</span></button>
+      </div>
+    </div>
+
+    <div class="hksub">
+      <h3>虚拟桌面</h3>
+      <div class="hkgrid">
+        <button class="hkbtn" data-hk="vdesk_new"><kbd>Win+Ctrl+D</kbd><span>新建桌面</span></button>
+        <button class="hkbtn" data-hk="vdesk_left"><kbd>Win+Ctrl+←</kbd><span>左侧桌面</span></button>
+        <button class="hkbtn" data-hk="vdesk_right"><kbd>Win+Ctrl+→</kbd><span>右侧桌面</span></button>
+        <button class="hkbtn" data-hk="vdesk_close"><kbd>Win+Ctrl+F4</kbd><span>关闭桌面</span></button>
+      </div>
+    </div>
+
+    <div class="hksub">
+      <h3>面板 · 搜索</h3>
+      <div class="hkgrid">
+        <button class="hkbtn" data-hk="quick_settings"><kbd>Win+A</kbd><span>快速设置</span></button>
+        <button class="hkbtn" data-hk="notif_center"><kbd>Win+N</kbd><span>通知中心</span></button>
+        <button class="hkbtn" data-hk="widgets"><kbd>Win+W</kbd><span>小组件</span></button>
+        <button class="hkbtn" data-hk="winx"><kbd>Win+X</kbd><span>高级菜单</span></button>
+        <button class="hkbtn" data-hk="run_dialog"><kbd>Win+R</kbd><span>运行对话框</span></button>
+        <button class="hkbtn" data-hk="search"><kbd>Win+S</kbd><span>Windows 搜索</span></button>
+        <button class="hkbtn" data-hk="feedback"><kbd>Win+F</kbd><span>反馈中心</span></button>
+        <button class="hkbtn" data-hk="sysinfo"><kbd>Win+Pause</kbd><span>系统信息</span></button>
+      </div>
+    </div>
+
+    <div class="hksub">
+      <h3>输入 · 剪贴板</h3>
+      <div class="hkgrid">
+        <button class="hkbtn" data-hk="clip_history"><kbd>Win+V</kbd><span>剪贴板历史</span></button>
+        <button class="hkbtn" data-hk="emoji"><kbd>Win+.</kbd><span>表情符号面板</span></button>
+        <button class="hkbtn" data-hk="ime_switch"><kbd>Win+Space</kbd><span>切换输入法</span></button>
+        <button class="hkbtn" data-hk="voice_type"><kbd>Win+H</kbd><span>语音输入</span></button>
+      </div>
+    </div>
+
+    <div class="hksub">
+      <h3>屏幕 · 游戏</h3>
+      <div class="hkgrid">
+        <button class="hkbtn" data-hk="project"><kbd>Win+P</kbd><span>投影模式</span></button>
+        <button class="hkbtn" data-hk="cast"><kbd>Win+K</kbd><span>无线投屏</span></button>
+        <button class="hkbtn" data-hk="shot_full"><kbd>Win+PrtScn</kbd><span>全屏截图</span></button>
+        <button class="hkbtn" data-hk="gamebar"><kbd>Win+G</kbd><span>Xbox 游戏栏</span></button>
+        <button class="hkbtn" data-hk="gamerec"><kbd>Win+Alt+R</kbd><span>录制开关</span></button>
+        <button class="hkbtn" data-hk="magnifier"><kbd>Win+=</kbd><span>放大镜</span></button>
+        <button class="hkbtn" data-hk="explorer_qa"><kbd>Win+E</kbd><span>资源管理器</span></button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>win-panel · 仅监听 127.0.0.1:8830 · 服务端白名单固定命令/固定按键，网页不能执行任意指令</footer>
+
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3 id="mTitle">确认操作</h3>
+    <p id="mText">确定执行？</p>
+    <div class="acts">
+      <button class="no" id="mNo">取消</button>
+      <button class="yes" id="mYes">确认执行</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+(function () {
+  var kind = 'shutdown';
+  var pending = null;          // 服务端状态
+  var pendingAt = 0;           // 收到状态时本地 Date.now()
+  var remainBase = 0;          // 当时剩余 ms
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- toast / confirm ----------
+  var toastTimer = null;
+  function toast(msg, type) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.className = 'show ' + (type || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = ''; }, 2600);
+  }
+
+  function confirmDialog(title, text) {
+    return new Promise(function (resolve) {
+      $('mTitle').textContent = title;
+      $('mText').textContent = text;
+      $('mask').classList.add('show');
+      function done(v) {
+        $('mask').classList.remove('show');
+        $('mYes').onclick = null; $('mNo').onclick = null;
+        resolve(v);
+      }
+      $('mYes').onclick = function () { done(true); };
+      $('mNo').onclick = function () { done(false); };
+    });
+  }
+
+  // ---------- API（会话令牌防跨站驱动） ----------
+  var token = null;
+  async function getToken(force) {
+    if (!token || force) token = await fetch('/api/token').then(function (r) { return r.json(); }).then(function (d) { return d.token; });
+    return token;
+  }
+
+  async function post(action, params) {
+    var t = await getToken();
+    var doFetch = function (tk) {
+      return fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action, params: params || {}, token: tk })
+      });
+    };
+    var resp = await doFetch(t);
+    if (resp.status === 403) resp = await doFetch(await getToken(true)); // 服务重启后换发新令牌
+    if (resp.status === 415 || resp.status === 413) throw new Error('请求被服务端拒绝');
+    return resp.json();
+  }
+
+  function act(action, params) {
+    return post(action, params).catch(function () {
+      toast('服务不可达（面板可能已关闭）', 'err');
+      return null;
+    });
+  }
+
+  async function actConfirmed(action) {
+    var names = { shutdown_now: ['立即关机', '电脑将在瞬间关闭，所有未保存内容会丢失。'],
+                  restart_now: ['立即重启', '电脑将立即重启，所有未保存内容会丢失。'],
+                  logoff: ['注销当前用户', '将结束当前登录会话，未保存内容会丢失。'] };
+    var n = names[action] || [action, ''];
+    var ok = await confirmDialog(n[0], n[1]);
+    if (!ok) { toast('已放弃', ''); return; }
+    var r = await act(action, { confirmed: true });
+    if (r) finish(r);
+  }
+
+  function finish(r) {
+    if (!r) return; // act() 已就连接失败提示过
+    pollSeq++; // 用户动作的结果永远优先于在途轮询
+    if (r && r.ok) toast(r.message || '完成', 'ok');
+    else toast((r && r.message) || '操作失败', 'err');
+    if (r && r.pending) absorbPending(r.pending);
+    if (r && r.ok === false && !r.pending) refresh();
+  }
+
+  // ---------- 定时 ----------
+  function absorbPending(p) {
+    if (p) { pending = p; pendingAt = Date.now(); remainBase = p.remain_ms; expiryFired = false; }
+    else { pending = null; }
+    renderPending();
+  }
+
+  async function schedule(minutes) {
+    if (!minutes || minutes < 1 || minutes > 1440) { toast('请输入 1–1440 分钟', 'err'); return; }
+    var r = await act('schedule', { kind: kind, minutes: minutes });
+    finish(r);
+  }
+
+  $('seg').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    kind = b.dataset.kind;
+    Array.prototype.forEach.call($('seg').children, function (x) {
+      x.classList.toggle('on', x === b);
+      x.classList.toggle('red', x === b && kind === 'restart');
+    });
+    $('btnPlan').classList.toggle('red', kind === 'restart');
+  });
+
+  $('presets').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (b) schedule(parseInt(b.dataset.min, 10));
+  });
+  $('btnPlan').addEventListener('click', function () {
+    schedule(parseInt($('customMin').value, 10));
+  });
+  $('customMin').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') schedule(parseInt($('customMin').value, 10));
+  });
+  $('btnCancel').addEventListener('click', async function () {
+    var r = await act('cancel');
+    finish(r);
+  });
+
+  // ---------- 电源 / 维护 ----------
+  document.querySelectorAll('[data-act]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var a = b.dataset.act;
+      if (a === 'shutdown_now' || a === 'restart_now' || a === 'logoff') actConfirmed(a);
+      else act(a).then(finish);
+    });
+  });
+  // 快捷启动：动作名即服务端白名单键（taskmgr/settings/...），事件委托
+  $('agrid').addEventListener('click', function (e) {
+    var b = e.target.closest('.abtn');
+    if (b) act(b.dataset.launch).then(finish);
+  });
+  // Win 快捷键：data-hk 即服务端 HOTKEYS 白名单键
+  $('hkcard').addEventListener('click', function (e) {
+    var b = e.target.closest('.hkbtn');
+    if (b) act(b.dataset.hk).then(finish);
+  });
+
+  // ---------- 自定义链接（文件夹 / 网站，links.json 持久化） ----------
+  var links = { folders: [], sites: [] };
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;  // 一律 textContent，用户输入不进 HTML
+    return e;
+  }
+
+  function renderLinks() {
+    [['folders', 'fgrid'], ['sites', 'wgrid']].forEach(function (cfg) {
+      var kind = cfg[0], grid = $(cfg[1]);
+      grid.innerHTML = '';
+      if (!links[kind] || !links[kind].length) {
+        grid.appendChild(el('div', 'empty-tip', '还没有条目，用下面的表单添加一个吧'));
+        return;
+      }
+      links[kind].forEach(function (item) {
+        var b = el('button', 'abtn link');
+        b.dataset.kind = kind;
+        b.dataset.name = item.name;
+        b.title = kind === 'folders' ? item.path : item.url;  // 悬停看完整路径/网址
+        b.appendChild(el('span', 'g', kind === 'folders' ? '▣' : '↗'));
+        var txt = el('span', 'txt');
+        txt.appendChild(el('b', null, item.name));
+        txt.appendChild(el('small', null, kind === 'folders' ? item.path : item.url));
+        b.appendChild(txt);
+        var del = el('span', 'del', '✕');
+        del.title = '删除';
+        b.appendChild(del);
+        grid.appendChild(b);
+      });
+    });
+  }
+
+  async function loadLinks() {
+    try {
+      var r = await fetch('/api/links').then(function (x) { return x.json(); });
+      if (r && r.folders) { links = r; renderLinks(); }
+    } catch (e) { /* 服务未起时保持现状 */ }
+  }
+
+  function gridClick(kind) {
+    return function (e) {
+      var b = e.target.closest('.abtn.link');
+      if (!b) return;
+      if (e.target.closest('.del')) {
+        act('del_link', { kind: kind, name: b.dataset.name }).then(function (r) {
+          finish(r);
+          loadLinks();
+        });
+      } else {
+        act(kind === 'folders' ? 'open_folder' : 'open_site', { name: b.dataset.name }).then(finish);
+      }
+    };
+  }
+  $('fgrid').addEventListener('click', gridClick('folders'));
+  $('wgrid').addEventListener('click', gridClick('sites'));
+
+  function addLink(kind, nameEl, targetEl) {
+    var name = nameEl.value.trim(), target = targetEl.value.trim();
+    if (!name || !target) { toast('名称和内容都要填', 'err'); return; }
+    act('add_link', { kind: kind, name: name, target: target }).then(function (r) {
+      finish(r);
+      if (r && r.ok) { nameEl.value = ''; targetEl.value = ''; loadLinks(); }
+    });
+  }
+  $('fAdd').addEventListener('click', function () { addLink('folders', $('fName'), $('fPath')); });
+  $('wAdd').addEventListener('click', function () { addLink('sites', $('wName'), $('wUrl')); });
+
+  // ---------- 倒计时显示 ----------
+  function renderPending() {
+    var box = $('pending');
+    if (!pending) { box.classList.remove('show'); return; }
+    box.classList.add('show');
+    $('cdLbl').textContent = pending.kind === 'restart' ? '后自动重启' : '后自动关机';
+  }
+  var expiryFired = false;
+  function tick() {
+    // 本地每秒递减；与服务端 5s 轮询校准
+    if (pending) {
+      var remain = Math.max(0, remainBase - (Date.now() - pendingAt));
+      var total = pending.total_ms || remainBase || 1;
+      var s = Math.round(remain / 1000);
+      $('cd').textContent = String(Math.floor(s / 3600)).padStart(2, '0') + ':' +
+        String(Math.floor(s % 3600 / 60)).padStart(2, '0') + ':' +
+        String(s % 60).padStart(2, '0');
+      $('cdBar').style.width = (remain / total * 100) + '%';
+      if (remain <= 0 && !expiryFired) { expiryFired = true; refresh(); }
+    }
+  }
+
+  // ---------- 状态轮询 ----------
+  function fmtUptime(ms) {
+    var s = Math.floor(ms / 1000), d = Math.floor(s / 86400);
+    s -= d * 86400;
+    var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+    return (d ? d + ' 天 ' : '') + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  }
+  var pollSeq = 0;        // 只接受最后一次轮询/动作的结果，丢弃过期响应
+  var refreshing = false;
+  async function refresh() {
+    if (refreshing) return;
+    refreshing = true;
+    var seq = ++pollSeq;
+    try {
+      var r = await fetch('/api/status').then(function (x) { return x.json(); });
+      if (seq !== pollSeq) return; // 在途期间已有更新的轮询或用户动作
+      $('host').textContent = r.host;
+      $('user').textContent = r.user;
+      $('uptime').textContent = '已开机 ' + fmtUptime(r.uptime_ms);
+      if (r.pending) absorbPending(r.pending); else if (pending) absorbPending(null);
+    } catch (e) { /* 服务未起时静默 */ }
+    finally { refreshing = false; }
+  }
+
+  function clock() {
+    var d = new Date();
+    $('clock').textContent = String(d.getHours()).padStart(2, '0') + ':' +
+      String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+  }
+
+  clock(); tick(); refresh(); loadLinks();
+  setInterval(clock, 1000);
+  setInterval(tick, 250);
+  setInterval(refresh, 5000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+# 用户自管链接（含私人目录，首次运行自动生成默认版）
+links.json
+# 本机解释器路径覆盖
+python-path.txt
+
+# CDP 冒烟测试的浏览器 profile（含缓存/cookie 级数据，勿提交）
+tools/.cdp-profile/
