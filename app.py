@@ -83,8 +83,9 @@ LAUNCH = {
     # rundll32 sysdm.cpl,EditEnvironmentVariables 直接弹「环境变量」对话框，
     # 比 SystemPropertiesAdvanced 再点一层快
     'envvars':   ([sys32('rundll32.exe'), 'sysdm.cpl,EditEnvironmentVariables'], '环境变量'),
-    # 奶龙桌宠（Petdex 桌面版，宠物包 nailong-7 手动装于 ~/.petdex/pets）
-    'petdex':    ([os.path.expandvars(r'%LOCALAPPDATA%\Programs\Petdex\petdex-desktop.exe')], '奶龙桌宠'),
+    # 裂变奶龙桌宠（自研单进程 tkinter，笑时喷出小奶龙；项目 E:\1workspace\nailong-pet）
+    'nailong':   ([r'C:\Users\4v\AppData\Local\Programs\Python\Python311\pythonw.exe',
+                   r'E:\1workspace\nailong-pet\nailong.py'], '裂变奶龙桌宠'),
 }
 
 # ---------- 用户自定义链接（文件夹 / 网站，links.json 持久化，网页可增删） ----------
